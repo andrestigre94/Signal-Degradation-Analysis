@@ -9,7 +9,7 @@ editor: visual
 
 Here, we are going to analyze the data obtained from experiments explained in the `README.md` document. This is a different quarto in which I will analyze the data based on Daniel T. Blumstein recommendations after our meeting on 02/April/2026.
 
-## Reading packages and data files
+## 1. Reading packages and data files
 
 We will activate the dataset and establish the working locationisables the printing of code (only output is displayed).
 
@@ -80,7 +80,7 @@ data1 <- data %>%
   )
 ```
 
-## Exploratory graps
+## Exploratory graphs
 
 And, we will proceed with some exploratory graphs. First, the proportion of responses for each type.
 
@@ -160,101 +160,3 @@ ggplot(data1, aes(x = dist_class, fill = ordinate)) +
 ```
 
 ## USING MULTINOMIAL
-
-```{r}
-data2 <- data1 %>% filter(pb_spp != "CONTRL")
-
-
-multin_dist1 <- brm(formula = ordinate ~ real_d,
-                   data = data2,
-                   family = categorical(link = "logit"),
-                   chains = 4, iter = 10000, warmup = 5000, cores = 4)
-
-plot(multin_dist)
-print(multin_dist1, digits = 4)
-
-posterior_summary(multin_dist, probs = c(0.025, 0.975, 0.05, 0.95))
-
-#### relative to the effect of distance on doing nothing, the effect of distance in looking around is significantly different. This was shown in b_muLookAround_real_d
-####relative to the effect of distance on doing nothing, the effect of distance on diving/freezing is not significantly different. But, suggest a positive marginal trend. Shown here b_muDiveFreeze_real_d 
-
-slope_dist_divefrz <- as_draws_df(multin_dist) %>% select("b_muDiveFreeze_real_d") %>% pull(1)
-
-slope_dist_lookarnd <- as_draws_df(multin_dist) %>% select("b_muLookAround_real_d") %>% pull(1)
-
-mean(slope_dist_divefrz>0)
-
-###the 70% of the difference in slopes for the effect of distance on diving/freezing against doing nothings is above 0
-
-delta_dist_divfrzlookarnd <- slope_dist_divefrz - slope_dist_lookarnd
-
-posterior_summary(delta_dist_divfrzlookarnd)
-
-###so, on this one, relative to the effect of distance on diving/freezing, the effect of distance on looking around is significantly different. This was observed after the result of the Estimates after looking at the delta delta
-
-
-
-
-#####TASK: RUN THE MODEL BUT TELLING IT WHICH ONE I WANTED TO BE THE REFERENCE. THIS TO CHANGE FROM THE REFERENCE AS DOING NOTHING TO SOMETHING ELSE TO BE DIVE/FREEZE. AND THEN LOOK AT THE MU_LOOKARND_REALD 
-#slope_dist_lookarnd <- as_draws_df(multin_dist) %>% select("b_muLookAround_real_d") %>% pull(1) MUST BE EQUAL TO posterior_summary(delta_dist_divfrzlookarnd)
-
-```
-
-```{r}
-multin_dist.pb <- brm(formula = ordinate ~ real_d + pb_spp,
-                   data = data1,
-                   family = categorical(link = "logit"),
-                   chains = 4, iter = 10000, warmup = 5000, cores = 4)
-
-plot(multin_dist.pb)
-print(multin_dist.pb, digits = 4)
-```
-
-## Running the models
-
-### 1. Individual models
-
-Before running the models, we will exclude, obviously, the CONTRL responses.
-
-```{r}
-data.models <- data1 %>% filter(pb_spp != "CONTRL")
-```
-
-Now, analyzing the data running the models.
-
-```{r}
-mod_ord_dist <- clm(ordinate ~ real_d, data = data.models, link = "logit")
-summary(mod_ord_dist)
-```
-
-```{r}
-mod_ord_dist_spp <- clm(ordinate ~ real_d + pb_spp, data = data.models, link = "logit")
-summary(mod_ord_dist_spp)
-```
-
-```{r}
-mod_ord_inter <- clm(ordinate ~ real_d * pb_spp, data = data.models, link = "logit")
-summary(mod_ord_inter)
-```
-
-```{r}
-AIC(mod_ord_dist, mod_ord_dist_spp, mod_ord_inter)
-```
-
-```{r}
-mod_ord_inter_re <- clmm(ordinate ~ real_d * pb_spp + (1 | flock_name),
-                         data = data.models,
-                         link = "logit")
-summary(mod_ord_inter_re)
-```
-
-```{r}
-bmod_ord_re <- brm(
-  ordinate ~ real_d + pb_spp + (1 | flock_name),
-  data = data.models,
-  family = cumulative(link = "logit"),
-  chains = 4, iter = 10000, warmup = 5000, cores = 4
-)
-
-print(bmod_ord_re, print = 4)
-```
