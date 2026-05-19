@@ -1,0 +1,260 @@
+---
+title: "Signal Degradation Analysis"
+author: "Andrés Felipe Tigreros Andrade"
+format: html
+editor: visual
+---
+
+# When Eavesdropping Fades: Spatial Degradation of Alarm Signals in Amazonian Mixed-species Flocks
+
+Here, we are going to analyze the data obtained from experiments explained in the `README.md` document. This is a different quarto in which I will analyze the data based on Daniel T. Blumstein recommendations after our meeting on 02/April/2026.
+
+## Reading packages and data files
+
+We will activate the dataset and establish the working locationisables the printing of code (only output is displayed).
+
+```{r message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(patchwork)
+library(lme4)
+library(Matrix)
+library(betareg)
+library(glmmTMB)
+library(AICcmodavg)
+library(lmerTest)
+library(extrafont)
+library(lmtest)
+library(fastDummies)
+library(janitor)
+library(mclogit)
+library(scales)
+library(here)
+library(brms)
+library(ggeffects)
+library(lme4)
+library(ordinal)
+```
+
+Reading the data and assign it to a string. Also, making some changes in it in order to add a new column that will contain the real distance as the sum of the distances between MYLO and observer 1 and observer 2. Also, adding categorical descriptions to the different responses.
+
+```{r}
+data <- read_csv("finalized_playbacks.csv") %>% 
+  janitor::clean_names() %>%                          ##polishing the names of each columns using this function from janitor 
+  mutate(real_d = distance1 + distance2,              ##adding a colum in which I sum both distance from the observer 1 and 2 (see README for more details)
+         response_cat = factor(rpta_true, levels = c(0, 1, 2, 3, 4), labels = c("No Response", "Dive", "Freeze", "Look Around", "Countercall")))          
+
+###Confirming
+head(data)
+str(data)
+```
+
+For this, after talking to Ari and Dan, they recommended me to do an ordination of the responses. This will be determined as: 0, no response observed; 1 will include just the look around response; and 2 will contain freezing and diving response. Why? Because, we are basically giving an order of intensity to the behavioral responses observed for the experiments, from the less intense to the more intense one.
+
+In order to do this, we will use `tidyverse` package to change the response we already have. Former classification was: 0, no response; 1, dive; 2, freeze; 3; look around; and 4, counter call. We will exclude the last one due to we only had 2 reactions. We will call the new column with this values "ordinate"
+
+```{r}
+data <- data %>%  mutate(ordinate = case_when(
+      response_cat %in% c("No Response") ~ 0,
+      response_cat %in% c("Look Around") ~ 1,
+      response_cat %in% c("Dive", "Freeze") ~ 2))
+
+##Dropping the 2 NAs
+
+data <- data %>% filter(!is.na(ordinate))
+      
+
+```
+
+Now, let's make some readable labels by ordinating this responses.
+
+```{r}
+data1 <- data %>%
+  mutate(
+    ordinate = factor(
+      ordinate,
+      levels = c(0, 1, 2),
+      labels = c("No Response", "Look Around", "Dive/Freeze"),
+      ordered = TRUE
+    )
+  )
+```
+
+## Exploratory graps
+
+And, we will proceed with some exploratory graphs. First, the proportion of responses for each type.
+
+```{r}
+ggplot(data1, aes(x = pb_spp, fill = ordinate)) +
+  geom_bar(position = "fill") +
+  labs(
+    x = "Playback species",
+    y = "Proportion",
+    fill = "Response"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+```
+
+And now, we will look at the responses by distances.
+
+```{r}
+data1 <- data1 %>%
+  mutate(
+    dist_class = case_when(
+      real_d >= 5  & real_d < 15 ~ "10",
+      real_d >= 15 & real_d < 25 ~ "20",
+      real_d >= 25 & real_d < 35 ~ "30",
+      real_d >= 35 & real_d < 45 ~ "40",
+      real_d >= 45 & real_d <= 50 ~ "45–50"
+    ),
+    dist_class = factor(dist_class, levels = c("10", "20", "30", "40", "45–50"))
+  )
+
+only_look <- data1 %>% filter(ordinate != "Dive/Freeze")
+only_divfree <- data1 %>% filter(ordinate != "Look Around")
+
+
+ggplot(data1, aes(x = dist_class, fill = ordinate)) +
+  geom_bar(position = "fill") +
+  labs(
+    x = "Distance class (m)",
+    y = "Proportion",
+    fill = "Response"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+ggplot(only_divfree, aes(x = dist_class, fill = ordinate)) +
+  geom_bar(position = "fill") +
+  labs(
+    x = "Distance class (m)",
+    y = "Proportion",
+    fill = "Response"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+ggplot(only_look, aes(x = dist_class, fill = ordinate)) +
+  geom_bar(position = "fill") +
+  labs(
+    x = "Distance class (m)",
+    y = "Proportion",
+    fill = "Response"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data1, aes(x = dist_class, fill = ordinate)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ pb_spp) +
+  labs(
+    x = "Distance class (m)",
+    y = "Proportion",
+    fill = "Response"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+```
+
+## USING MULTINOMIAL
+
+```{r}
+data2 <- data1 %>% filter(pb_spp != "CONTRL")
+
+
+multin_dist1 <- brm(formula = ordinate ~ real_d,
+                   data = data2,
+                   family = categorical(link = "logit"),
+                   chains = 4, iter = 10000, warmup = 5000, cores = 4)
+
+plot(multin_dist)
+print(multin_dist1, digits = 4)
+
+posterior_summary(multin_dist, probs = c(0.025, 0.975, 0.05, 0.95))
+
+#### relative to the effect of distance on doing nothing, the effect of distance in looking around is significantly different. This was shown in b_muLookAround_real_d
+####relative to the effect of distance on doing nothing, the effect of distance on diving/freezing is not significantly different. But, suggest a positive marginal trend. Shown here b_muDiveFreeze_real_d 
+
+slope_dist_divefrz <- as_draws_df(multin_dist) %>% select("b_muDiveFreeze_real_d") %>% pull(1)
+
+slope_dist_lookarnd <- as_draws_df(multin_dist) %>% select("b_muLookAround_real_d") %>% pull(1)
+
+mean(slope_dist_divefrz>0)
+
+###the 70% of the difference in slopes for the effect of distance on diving/freezing against doing nothings is above 0
+
+delta_dist_divfrzlookarnd <- slope_dist_divefrz - slope_dist_lookarnd
+
+posterior_summary(delta_dist_divfrzlookarnd)
+
+###so, on this one, relative to the effect of distance on diving/freezing, the effect of distance on looking around is significantly different. This was observed after the result of the Estimates after looking at the delta delta
+
+
+
+
+#####TASK: RUN THE MODEL BUT TELLING IT WHICH ONE I WANTED TO BE THE REFERENCE. THIS TO CHANGE FROM THE REFERENCE AS DOING NOTHING TO SOMETHING ELSE TO BE DIVE/FREEZE. AND THEN LOOK AT THE MU_LOOKARND_REALD 
+#slope_dist_lookarnd <- as_draws_df(multin_dist) %>% select("b_muLookAround_real_d") %>% pull(1) MUST BE EQUAL TO posterior_summary(delta_dist_divfrzlookarnd)
+
+```
+
+```{r}
+multin_dist.pb <- brm(formula = ordinate ~ real_d + pb_spp,
+                   data = data1,
+                   family = categorical(link = "logit"),
+                   chains = 4, iter = 10000, warmup = 5000, cores = 4)
+
+plot(multin_dist.pb)
+print(multin_dist.pb, digits = 4)
+```
+
+## Running the models
+
+### 1. Individual models
+
+Before running the models, we will exclude, obviously, the CONTRL responses.
+
+```{r}
+data.models <- data1 %>% filter(pb_spp != "CONTRL")
+```
+
+Now, analyzing the data running the models.
+
+```{r}
+mod_ord_dist <- clm(ordinate ~ real_d, data = data.models, link = "logit")
+summary(mod_ord_dist)
+```
+
+```{r}
+mod_ord_dist_spp <- clm(ordinate ~ real_d + pb_spp, data = data.models, link = "logit")
+summary(mod_ord_dist_spp)
+```
+
+```{r}
+mod_ord_inter <- clm(ordinate ~ real_d * pb_spp, data = data.models, link = "logit")
+summary(mod_ord_inter)
+```
+
+```{r}
+AIC(mod_ord_dist, mod_ord_dist_spp, mod_ord_inter)
+```
+
+```{r}
+mod_ord_inter_re <- clmm(ordinate ~ real_d * pb_spp + (1 | flock_name),
+                         data = data.models,
+                         link = "logit")
+summary(mod_ord_inter_re)
+```
+
+```{r}
+bmod_ord_re <- brm(
+  ordinate ~ real_d + pb_spp + (1 | flock_name),
+  data = data.models,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 10000, warmup = 5000, cores = 4
+)
+
+print(bmod_ord_re, print = 4)
+```
