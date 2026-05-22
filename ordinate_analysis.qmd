@@ -34,6 +34,7 @@ library(brms)
 library(ggeffects)
 library(lme4)
 library(ordinal)
+library(MASS)
 ```
 
 Reading the data and assign it to a string. Also, making some changes in it in order to add a new column that will contain the real distance as the sum of the distances between MYLO and observer 1 and observer 2. Also, adding categorical descriptions to the different responses.
@@ -54,10 +55,13 @@ For this, after talking to Ari and Dan, they recommended me to do an ordination 
 In order to do this, we will use `tidyverse` package to change the response we already have. Former classification was: 0, no response; 1, dive; 2, freeze; 3; look around; and 4, counter call. We will exclude the last one due to we only had 2 reactions. We will call the new column with this values "ordinate"
 
 ```{r}
-data <- data %>%  mutate(ordinate = case_when(
+data <- data %>%  mutate(ord = case_when(
       response_cat %in% c("No Response") ~ 0,
       response_cat %in% c("Look Around") ~ 1,
       response_cat %in% c("Dive", "Freeze") ~ 2))
+
+data$ord <- as.factor(data$ord)
+str(data)
 
 ##Dropping the 2 NAs
 
@@ -71,8 +75,8 @@ Now, let's make some readable labels by ordinating this responses.
 ```{r}
 data1 <- data %>%
   mutate(
-    ordinate = factor(
-      ordinate,
+    ord = factor(
+      ord,
       levels = c(0, 1, 2),
       labels = c("No Response", "Look Around", "Dive/Freeze"),
       ordered = TRUE
@@ -111,11 +115,11 @@ data1 <- data1 %>%
     dist_class = factor(dist_class, levels = c("10", "20", "30", "40", "45–50"))
   )
 
-only_look <- data1 %>% filter(ordinate != "Dive/Freeze")
-only_divfree <- data1 %>% filter(ordinate != "Look Around")
+only_look <- data1 %>% filter(ord != "Dive/Freeze")
+only_divfree <- data1 %>% filter(ord != "Look Around")
 
 
-ggplot(data1, aes(x = dist_class, fill = ordinate)) +
+ggplot(data1, aes(x = dist_class, fill = ord)) +
   geom_bar(position = "fill") +
   labs(
     x = "Distance class (m)",
@@ -125,7 +129,7 @@ ggplot(data1, aes(x = dist_class, fill = ordinate)) +
   scale_y_continuous(labels = scales::percent) +
   theme_minimal()
 
-ggplot(only_divfree, aes(x = dist_class, fill = ordinate)) +
+ggplot(only_divfree, aes(x = dist_class, fill = ord)) +
   geom_bar(position = "fill") +
   labs(
     x = "Distance class (m)",
@@ -135,7 +139,7 @@ ggplot(only_divfree, aes(x = dist_class, fill = ordinate)) +
   scale_y_continuous(labels = scales::percent) +
   theme_minimal()
 
-ggplot(only_look, aes(x = dist_class, fill = ordinate)) +
+ggplot(only_look, aes(x = dist_class, fill = ord)) +
   geom_bar(position = "fill") +
   labs(
     x = "Distance class (m)",
@@ -147,7 +151,7 @@ ggplot(only_look, aes(x = dist_class, fill = ordinate)) +
 ```
 
 ```{r}
-ggplot(data1, aes(x = dist_class, fill = ordinate)) +
+ggplot(data1, aes(x = dist_class, fill = ord)) +
   geom_bar(position = "fill") +
   facet_wrap(~ pb_spp) +
   labs(
@@ -159,4 +163,32 @@ ggplot(data1, aes(x = dist_class, fill = ordinate)) +
   theme_minimal()
 ```
 
-## USING MULTINOMIAL
+## Building the Ordinal
+
+```{r}
+view(data1)
+str(data1)
+
+any(is.na(data1$ord))
+any(is.na(data1$real_d))
+any(is.na(data1$pb_spp))
+
+
+data1 <- data1 %>% drop_na(ord) %>% 
+  filter(pb_spp != "CONTRL")
+
+ggplot(data1, aes(x = ord, y = real_d)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.5)
+
+data2 <- data1 %>%  mutate(
+    ord = ordered(ord, levels = c("No Response", "Look Around", "Dive/Freeze")),
+    flock_name = factor(flock_name),
+    real_d_scaled = as.numeric(scale(real_d))
+  )
+
+
+model_clm <- clm(ord ~ real_d_scaled*pb_spp, data = data2, Hess = TRUE)
+summary(model_clm)
+
+```
