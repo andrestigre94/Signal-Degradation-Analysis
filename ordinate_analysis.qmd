@@ -65,7 +65,7 @@ str(data)
 
 ##Dropping the 2 NAs
 
-data <- data %>% filter(!is.na(ordinate))
+data <- data %>% filter(!is.na(ord))
       
 
 ```
@@ -75,7 +75,7 @@ Now, let's make some readable labels by ordinating this responses.
 ```{r}
 data1 <- data %>%
   mutate(
-    ord = factor(
+    ordinate = factor(
       ord,
       levels = c(0, 1, 2),
       labels = c("No Response", "Look Around", "Dive/Freeze"),
@@ -89,7 +89,7 @@ data1 <- data %>%
 And, we will proceed with some exploratory graphs. First, the proportion of responses for each type.
 
 ```{r}
-ggplot(data1, aes(x = pb_spp, fill = ordinate)) +
+ggplot(data1, aes(x = pb_spp, fill = ord)) +
   geom_bar(position = "fill") +
   labs(
     x = "Playback species",
@@ -166,7 +166,6 @@ ggplot(data1, aes(x = dist_class, fill = ord)) +
 ## Building the Ordinal
 
 ```{r}
-view(data1)
 str(data1)
 
 any(is.na(data1$ord))
@@ -181,14 +180,18 @@ ggplot(data1, aes(x = ord, y = real_d)) +
   geom_boxplot() +
   geom_jitter(width = 0.1, alpha = 0.5)
 
-data2 <- data1 %>%  mutate(
-    ord = ordered(ord, levels = c("No Response", "Look Around", "Dive/Freeze")),
+data2 <- data1 %>% mutate(
+    ordinate = ordered(ordinate, levels = c("No Response", "Look Around", "Dive/Freeze")),
     flock_name = factor(flock_name),
     real_d_scaled = as.numeric(scale(real_d))
   )
 
 
-model_clm <- clm(ord ~ real_d_scaled*pb_spp, data = data2, Hess = TRUE)
+model_clm <- clm(ordinate ~ real_d*pb_spp, data = data2, Hess = TRUE)
 summary(model_clm)
+
+ggplot(data2, aes(x = real_d_scaled)) +
+  geom_histogram()
+
 
 ```

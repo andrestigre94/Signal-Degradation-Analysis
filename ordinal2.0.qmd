@@ -1,0 +1,37 @@
+---
+title: "Ordinal 2.0"
+author: "Andrés Felipe Tigreros Andrade"
+format: html
+editor: visual
+---
+
+## When Eavesdropping Fades: Spatial Degradation of Alarm Signals in Amazonian Mixed-species Flocks
+
+Here, we are going to analyze the data obtained from experiments explained in the `README.md` document. This is a different quarto in which I will analyze the data based on Daniel T. Blumstein recommendations after our meeting on 02/April/2026.
+
+## 1. Reading packages and data files
+
+We will activate the dataset and establish the working locationisables the printing of code (only output is displayed).
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(patchwork)
+library(lme4)
+library(Matrix)
+library(betareg)
+library(glmmTMB)
+library(AICcmodavg)
+library(lmerTest)
+library(extrafont)
+library(lmtest)
+library(fastDummies)
+library(janitor)
+library(mclogit)
+library(scales)
+library(here)
+library(brms)
+library(ggeffects)
+library(lme4)
+library(ordinal)
+library(MASS)
+```
