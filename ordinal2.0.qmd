@@ -9,7 +9,9 @@ editor: visual
 
 Here, we are going to analyze the data obtained from experiments explained in the `README.md` document. This is a different quarto in which I will analyze the data based on Daniel T. Blumstein recommendations after our meeting on 02/April/2026.
 
-## 1. Reading packages and data files
+## 1. Starting with the setup
+
+### 1.1. Activating packages
 
 We will activate the dataset and establish the working locationisables the printing of code (only output is displayed).
 
@@ -34,4 +36,19 @@ library(ggeffects)
 library(lme4)
 library(ordinal)
 library(MASS)
+```
+
+### 1.2. Reading the dataset
+
+We are going to read the dataset in which we filled all of the data collected from the experiments. We will call `janitor::clean_names()` in order to have decent column names. Then, use `mutate()` in order to create a column named "real_d" in which we sum both distances to have the actual distance measured in the field. The last use of mutate will be to create or assign a name to each of the levels of the response designed for *M. longipennis.*
+
+```{r}
+data <- read_csv(file = "finalized_playbacks.csv") %>% 
+  janitor::clean_names() %>%  ##making better column names
+  mutate(real_d = distance1 + distance2,  ##creating a column with real distance
+         response_cat = factor(rpta_true, levels = c(0, 1, 2, 3, 4), 
+                               labels = c("No Response", "Dive", "Freeze", "Look Around", "Countercall")))          
+  
+head(data)
+str(data)
 ```
