@@ -116,19 +116,27 @@ data1 %>% count(flock_name) %>%
 ## 2. Some graphs
 
 ```{r}
+data1_plot <- data1 %>%
+  mutate(dist_bin = cut(real_d,
+                        breaks = c(0, 15, 25, 35, 50),
+                        labels = c("≤15", "15–25", "25–35", ">35"),
+                        right = FALSE))
+
+# Quick check of the binning
+data1_plot %>% count(distance_treatment, dist_bin)
+
 # Ordering A
-data1 %>%
-  mutate(distance = factor(real_d, levels = c(10, 20, 30, 40))) %>%
-  count(pb_spp, distance, response_a) %>%
-  group_by(pb_spp, distance) %>%
+p_compA <- data1_plot %>%
+  count(pb_spp, dist_bin, response_a) %>%
+  group_by(pb_spp, dist_bin) %>%
   mutate(prop = n / sum(n),
          total = sum(n)) %>%
   ungroup() %>%
-  ggplot(aes(x = distance, y = prop, fill = response_a)) +
+  ggplot(aes(x = dist_bin, y = prop, fill = response_a)) +
   geom_col(position = "stack", width = 0.75, color = "white", linewidth = 0.3) +
   geom_text(
-    data = . %>% distinct(pb_spp, distance, total),
-    aes(x = distance, y = 1.04, label = paste0("n=", total)),
+    data = . %>% distinct(pb_spp, dist_bin, total),
+    aes(x = dist_bin, y = 1.04, label = paste0("n=", total)),
     inherit.aes = FALSE,
     size = 3, color = "grey30"
   ) +
@@ -137,7 +145,7 @@ data1 %>%
                     labels = c("No response", "Look around", "Freeze", "Dive")) +
   scale_y_continuous(labels = scales::percent_format(), expand = c(0, 0),
                      limits = c(0, 1.08)) +
-  labs(x = "Distance (m)", y = "Proportion of trials",
+  labs(x = "Realized distance (m)", y = "Proportion of trials",
        fill = "Response",
        title = "Ordering A: 4-level response") +
   theme_bw(base_size = 11) +
@@ -147,24 +155,26 @@ data1 %>%
         legend.position    = "right")
 
 # Ordering B
-p_compB <- data1 %>%
-  mutate(distance = factor(real_d, levels = c(10, 20, 30, 40))) %>%
-  count(pb_spp, real_d, response_b) %>%
-  group_by(pb_spp, real_d) %>%
+p_compB <- data1_plot %>%
+  count(pb_spp, dist_bin, response_b) %>%
+  group_by(pb_spp, dist_bin) %>%
   mutate(prop = n / sum(n),
          total = sum(n)) %>%
   ungroup() %>%
-  ggplot(aes(x = distance, y = prop, fill = response_b)) +
+  ggplot(aes(x = dist_bin, y = prop, fill = response_b)) +
   geom_col(position = "stack", width = 0.75, color = "white", linewidth = 0.3) +
-  geom_text(aes(label = paste0("n=", total), y = 1.04),
-            data = . %>% distinct(pb_spp, distance, total),
-            size = 3, color = "grey30") +
+  geom_text(
+    data = . %>% distinct(pb_spp, dist_bin, total),
+    aes(x = dist_bin, y = 1.04, label = paste0("n=", total)),
+    inherit.aes = FALSE,
+    size = 3, color = "grey30"
+  ) +
   facet_wrap(~ pb_spp) +
   scale_fill_brewer(palette = "YlOrRd", direction = -1,
                     labels = c("No response", "Look around", "Evasive")) +
   scale_y_continuous(labels = scales::percent_format(), expand = c(0, 0),
                      limits = c(0, 1.08)) +
-  labs(x = "Distance (m)", y = "Proportion of trials",
+  labs(x = "Realized distance (m)", y = "Proportion of trials",
        fill = "Response",
        title = "Ordering B: 3-level response (freeze + dive collapsed)") +
   theme_bw(base_size = 11) +
@@ -172,7 +182,6 @@ p_compB <- data1 %>%
         panel.grid.minor   = element_blank(),
         strip.background   = element_rect(fill = "grey90", color = NA),
         legend.position    = "right")
-
 
 p_compA
 p_compB
